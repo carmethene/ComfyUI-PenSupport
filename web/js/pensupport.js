@@ -105,8 +105,12 @@ function setupPenSupport() {
     let target = document.elementFromPoint(src.clientX, src.clientY) ?? src.target;
     if (canvasEl) {
       const r = canvasEl.getBoundingClientRect();
-      if (src.clientX >= r.left && src.clientX <= r.right &&
-          src.clientY >= r.top  && src.clientY <= r.bottom) {
+      const inCanvas = src.clientX >= r.left && src.clientX <= r.right &&
+                       src.clientY >= r.top  && src.clientY <= r.bottom;
+      // Only override to canvas when elementFromPoint found a non-interactive element
+      // (e.g. a transparent overlay sibling of the canvas). The canvas fills the full
+      // viewport, so sidebar panels also fall within its bounds — don't override those.
+      if (inCanvas && !target.closest('button, a, input, select, textarea, [role="button"]')) {
         target = canvasEl;
       }
     }
