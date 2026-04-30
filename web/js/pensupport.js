@@ -100,6 +100,8 @@ function setupPenSupport() {
 
   // elementFromPoint on iPad can return an overlay div that is a sibling of the canvas,
   // not an ancestor — events dispatched there never reach LiteGraph's canvas listener.
+  // Real UI panels (dropdowns, sidebar) live in separate DOM subtrees outside the canvas
+  // container, so we only force canvas for elements inside that container.
   function dispatch(mouseType, src, buttons) {
     const canvasEl = getCanvasEl();
     let target = document.elementFromPoint(src.clientX, src.clientY) ?? src.target;
@@ -107,11 +109,17 @@ function setupPenSupport() {
       const r = canvasEl.getBoundingClientRect();
       const inCanvas = src.clientX >= r.left && src.clientX <= r.right &&
                        src.clientY >= r.top  && src.clientY <= r.bottom;
-      // Only override to canvas when elementFromPoint found a non-interactive element
-      // (e.g. a transparent overlay sibling of the canvas). The canvas fills the full
-      // viewport, so sidebar panels also fall within its bounds — don't override those.
-      if (inCanvas && !target.closest('button, a, input, select, textarea, [role="button"]')) {
-        target = canvasEl;
+      if (inCanvas) {
+        const p = canvasEl.parentElement;
+        const inContainer = p && p !== document.body && p.contains(target) && target !== canvasEl;
+        if (inContainer) {
+          // Element is inside the canvas container (could be overlay or sidebar).
+          // Override to canvas only when it's not an interactive element.
+          if (!target.closest('button,a,input,select,textarea,[role="button"],[role="option"],[role="menuitem"]'))
+            target = canvasEl;
+        }
+        // Elements outside the canvas container (e.g. LiteGraph combo popups appended to
+        // document.body) are left as-is — no override needed.
       }
     }
 
