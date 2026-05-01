@@ -115,7 +115,7 @@ function setupPenSupport() {
         if (inContainer) {
           // Element is inside the canvas container (could be overlay or sidebar).
           // Override to canvas only when it's not an interactive element.
-          if (!target.closest('button,a,input,select,textarea,[role="button"],[role="option"],[role="menuitem"]'))
+          if (!target.closest('button,a,input,select,textarea,[role="button"],[role="option"],[role="menuitem"],[data-testid*="minimap"],[class*="minimap"]'))
             target = canvasEl;
         }
         // Elements outside the canvas container (e.g. LiteGraph combo popups appended to
