@@ -93,6 +93,9 @@ function setupPenSupport() {
   let penDown = false;
   let penDownX = 0;
   let penDownY = 0;
+  // Element that received the pointerdown — all subsequent move/up events go to the same
+  // target to simulate pointer capture and prevent drag-off-edge leaving elements stuck.
+  let penTarget = null;
 
   function getCanvasEl() {
     return app.canvas?.canvas ?? document.querySelector('canvas');
@@ -102,10 +105,11 @@ function setupPenSupport() {
   // not an ancestor — events dispatched there never reach LiteGraph's canvas listener.
   // Real UI panels (dropdowns, sidebar) live in separate DOM subtrees outside the canvas
   // container, so we only force canvas for elements inside that container.
-  function dispatch(mouseType, src, buttons) {
+  // forcedTarget bypasses elementFromPoint entirely (used to pin move/up to the down target).
+  function dispatch(mouseType, src, buttons, forcedTarget = null) {
     const canvasEl = getCanvasEl();
-    let target = document.elementFromPoint(src.clientX, src.clientY) ?? src.target;
-    if (canvasEl) {
+    let target = forcedTarget ?? document.elementFromPoint(src.clientX, src.clientY) ?? src.target;
+    if (!forcedTarget && canvasEl) {
       const r = canvasEl.getBoundingClientRect();
       const inCanvas = src.clientX >= r.left && src.clientX <= r.right &&
                        src.clientY >= r.top  && src.clientY <= r.bottom;
@@ -185,7 +189,7 @@ function setupPenSupport() {
     const lg = window.LiteGraph;
     const savedBehavior = lg?.leftMouseClickBehavior;
     if (lg) lg.leftMouseClickBehavior = null;
-    dispatch("mousedown", e, 1);
+    penTarget = dispatch("mousedown", e, 1);
     if (lg) lg.leftMouseClickBehavior = savedBehavior;
   }, { capture: true, passive: false });
 
@@ -196,7 +200,9 @@ function setupPenSupport() {
     moveCursor(e.clientX, e.clientY);
     e.preventDefault();
     e.stopImmediatePropagation();
-    dispatch("mousemove", e, penDown ? 1 : 0);
+    // Pin move events to the down target while dragging so elements like the minimap
+    // continue receiving pointermove and don't get stuck in a drag state.
+    dispatch("mousemove", e, penDown ? 1 : 0, penDown ? penTarget : null);
   }, { capture: true, passive: false });
 
   window.addEventListener("pointerup", (e) => {
@@ -206,9 +212,10 @@ function setupPenSupport() {
     e.preventDefault();
     e.stopImmediatePropagation();
     setCursorPressed(false);
-    const target = dispatch("mouseup", e, 0);
+    const target = dispatch("mouseup", e, 0, penTarget);
     if (penDown && isTap(e.clientX, e.clientY)) dispatchClick(target, e);
     penDown = false;
+    penTarget = null;
   }, { capture: true, passive: false });
 
   window.addEventListener("pointercancel", (e) => {
@@ -218,8 +225,9 @@ function setupPenSupport() {
     e.preventDefault();
     e.stopImmediatePropagation();
     setCursorPressed(false);
-    dispatch("mouseup", e, 0);
+    dispatch("mouseup", e, 0, penTarget);
     penDown = false;
+    penTarget = null;
   }, { capture: true, passive: false });
 
   // iOS fires TouchEvent(stylus) alongside PointerEvent(pen) for the same Apple Pencil contact.
@@ -251,8 +259,9 @@ function setupPenSupport() {
         shiftKey: e.shiftKey, metaKey: e.metaKey,
         target: e.target,
       };
+      const isDown = mouseType === "mousedown";
       const isUp = mouseType === "mouseup";
-      if (mouseType === "mousedown") {
+      if (isDown) {
         setCursorPressed(true);
         penDown = true;
         penDownX = touch.clientX;
@@ -260,11 +269,14 @@ function setupPenSupport() {
       } else if (mouseType === "mousemove") {
         moveCursor(touch.clientX, touch.clientY);
       }
-      const target = dispatch(mouseType, src, isUp ? 0 : 1);
+      const forcedTarget = (!isDown && penDown) ? penTarget : null;
+      const target = dispatch(mouseType, src, isUp ? 0 : 1, forcedTarget);
+      if (isDown) penTarget = target;
       if (isUp) {
         setCursorPressed(false);
         if (penDown && isTap(touch.clientX, touch.clientY)) dispatchClick(target, src);
         penDown = false;
+        penTarget = null;
       }
     }, { capture: true, passive: false });
   }
