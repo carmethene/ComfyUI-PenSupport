@@ -45,8 +45,8 @@ const CURSOR_HIDE_MS = 600;
 //   * Hovering an interactable adds an inner dot to the ring so you can tell
 //     at a glance that "something will happen if I press here."
 //   * grab uses a larger ring (size signals grippability).
-//   * grabbing keeps its distinctive dark filled ring + bright dot — it
-//     overrides the pen-down dot because drag state matters more than press.
+//   * grabbing fills the ring with translucent white — distinct from a plain
+//     press, and overrides the pen-down dot since drag state is the headline.
 //   * Mode-specific decorations (crosshair ticks, resize arrows, etc.) layer
 //     around the ring + dot without obscuring the pen tip.
 const SVG = (body) => `<svg viewBox="0 0 24 24" width="24" height="24" xmlns="http://www.w3.org/2000/svg">${body}</svg>`;
